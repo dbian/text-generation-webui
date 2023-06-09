@@ -10,6 +10,8 @@ WORKDIR /build
 
 RUN python3 -m venv /build/venv
 RUN . /build/venv/bin/activate && \
+    pip config set global.index-url https://mirrors.ustc.edu.cn/pypi/web/simple
+RUN . /build/venv/bin/activate && \
     pip3 install --upgrade pip setuptools && \
     pip3 install torch torchvision torchaudio && \
     pip3 install -r requirements.txt
@@ -38,6 +40,9 @@ ARG WEBUI_VERSION
 RUN test -n "${WEBUI_VERSION}" && git reset --hard ${WEBUI_VERSION} || echo "Using provided webui source"
 
 RUN virtualenv /app/venv
+
+RUN . /app/venv/bin/activate && \
+    pip config set global.index-url https://mirrors.ustc.edu.cn/pypi/web/simple
 RUN . /app/venv/bin/activate && \
     pip3 install --upgrade pip setuptools && \
     pip3 install torch torchvision torchaudio
@@ -51,17 +56,31 @@ COPY extensions/elevenlabs_tts/requirements.txt /app/extensions/elevenlabs_tts/r
 COPY extensions/google_translate/requirements.txt /app/extensions/google_translate/requirements.txt
 COPY extensions/silero_tts/requirements.txt /app/extensions/silero_tts/requirements.txt
 COPY extensions/whisper_stt/requirements.txt /app/extensions/whisper_stt/requirements.txt
+COPY extensions/openai/requirements.txt /app/extensions/openai/requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip . /app/venv/bin/activate && cd extensions/api && pip3 install -r requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip . /app/venv/bin/activate && cd extensions/elevenlabs_tts && pip3 install -r requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip . /app/venv/bin/activate && cd extensions/google_translate && pip3 install -r requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip . /app/venv/bin/activate && cd extensions/silero_tts && pip3 install -r requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip . /app/venv/bin/activate && cd extensions/whisper_stt && pip3 install -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip . /app/venv/bin/activate && cd extensions/openai && pip3 install -r requirements.txt
 
+RUN git config --global http.sslVerify false
+RUN git config --global http.proxy http://192.168.31.1:7890
 COPY requirements.txt /app/requirements.txt
 RUN . /app/venv/bin/activate && \
+    pip config unset global.index-url
+RUN --mount=type=cache,target=/root/.cache/pip . /app/venv/bin/activate && \
+    export HTTPS_PROXY=http://192.168.31.1:7890 && \
     pip3 install -r requirements.txt
-
 RUN cp /app/venv/lib/python3.10/site-packages/bitsandbytes/libbitsandbytes_cuda118.so /app/venv/lib/python3.10/site-packages/bitsandbytes/libbitsandbytes_cpu.so
+
+
+ENV LLAMA_CUBLAS=1
+ENV CMAKE_ARGS="-DLLAMA_CUBLAS=on -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc" FORCE_CMAKE=1
+RUN . /app/venv/bin/activate && \
+    pip uninstall -y llama-cpp-python && \
+    CMAKE_ARGS="-DLLAMA_CUBLAS=on -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc" FORCE_CMAKE=1 pip install llama-cpp-python --no-cache-dir -i https://mirrors.ustc.edu.cn/pypi/web/simple
+
 
 COPY . /app/
 ENV CLI_ARGS=""

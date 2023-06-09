@@ -1,5 +1,13 @@
 version: "3.3"
 services:
+  chatgpt:
+    restart: unless-stopped
+    image: ghcr.io/mckaywrigley/chatbot-ui:main
+    ports:
+      - 3000:3000
+    environment:
+      - 'OPENAI_API_KEY=dummylol'
+      - 'OPENAI_API_HOST=http://text-generation-webui:5001'
   text-generation-webui:
     build:
       context: .
@@ -12,7 +20,9 @@ services:
       - "${HOST_PORT}:${CONTAINER_PORT}"
       - "${HOST_API_PORT}:${CONTAINER_API_PORT}"
       - "${HOST_API_STREAM_PORT}:${CONTAINER_API_STREAM_PORT}"
+      - 5001:5001
     stdin_open: true
+    restart: unless-stopped
     tty: true
     volumes:
       - ./characters:/app/characters
